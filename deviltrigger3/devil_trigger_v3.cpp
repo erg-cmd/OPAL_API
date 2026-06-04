@@ -1,5 +1,18 @@
-/* devil_trigger_v3.cpp
- * Python-equivalent OPAL preload, pause check, and READY negotiation.
+/**----------------------------------------
+ * @file devil_trigger_v3.cpp
+ * @author Elias R. Gracia (elias.gracia@uah.es)
+ * @brief Python-equivalent OPAL preload, pause check, and READY negotiation.
+ * This code is a revised version of the UDP-triggered OPAL-RT execution, 
+ * aiming to improve the negotiation process. This Code is a reinterpretation of
+ * "triggerv2.py".
+ * @version 0.1
+ * @date 2026-06-04
+ * @state Not working, for reference only
+ * @copyright Copyright (c) 2026
+ * 
+ * Compile with:
+ * g++ devil_trigger_v3.cpp -o devil_trigger_v3.exe -I"C:\OPAL-RT\RT-LAB\2021.3.4\common\include" -L"C:\OPAL-RT\RT-LAB\2021.3.4\common\lib" -lOpalApi -lws2_32
+ *
  */
 
 #include <chrono>

@@ -1,3 +1,17 @@
+/**----------------------------------------
+ * @file devil_trigger.cpp
+ * @author elias R. Gracia (elias.gracia@uah.es)
+ * @brief This code is not working but is a first approch to a simple UDP-triggered OPAL-RT execution. It is kept here for reference and learning purposes, but the working version is devil_trigger_v2.cpp.
+ * @version 0.1
+ * @date 2026-06-04
+ * @state Not working, for reference only
+ * @copyright Copyright (c) 2026
+ * 
+ * Compile with:
+ * g++ devil_trigger.cpp -o devil_trigger.exe -I"C:\OPAL-RT\RT-LAB\2021.3.4\common\include" -L"C:\OPAL-RT\RT-LAB\2021.3.4\common\lib" -lOpalApi -lws2_32
+ * 
+ */
+
 #include <iostream>
 #include <cstring>
 #include <string>
@@ -29,7 +43,7 @@ int main() {
 
     // Define Real-Time Mode: 
     // 1 = SIM_MODE (Hardware sync), 2 = SOFT_SIM_MODE, 3 = VIRTUAL_SIM_MODE
-    int realTimeMode = 1; 
+    int realTimeMode = 2; 
     double timeFactor = 1.0;
 
     std::cout << "[OPAL] Pre-loading model binaries to target node..." << std::endl;

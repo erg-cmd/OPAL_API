@@ -1,3 +1,18 @@
+"""
+    File: triggerv2.py
+    Brief: UDP-triggered OPAL-RT execution with improved negotiation process.
+    This script opens an RT-LAB project, ensures the model is paused, and waits 
+    for a specific UDP message to trigger execution. It includes a negotiation 
+    phase where the server validates the sender of the READY_ message before allowing
+    execution to proceed. The script also provides detailed logging of model states
+    and network interactions for better traceability.
+    
+    Note: This script is designed to run on a Windows machine with the OPAL-RT API
+    Date: 2024-06
+    @author: erg-cmd (elias.gracia@uah.es)
+"""
+
+
 import socket
 import struct
 import sys
@@ -43,7 +58,7 @@ EXPECTED_READY_IP = "192.168.10.123"
 EXPECTED_READY_PORT = 5008
 READY_TEXT = b"READY_"
 DUMMY_TEXT = b"ByeBye"
-PRESET_VALUES = [1.0, 0.005, 30.0, 1.0, 2.0, 10.0]
+PRESET_VALUES = [2.0, 0.005, 30.0, 1.0, 2.0, 10.0]
 NEGOTIATION_TIMEOUT_SECONDS = 60.0
 RESEND_PERIOD_SECONDS = 1.0
 

@@ -1,3 +1,17 @@
+/**----------------------------------------
+ * @file devil_trigger_v2.cpp
+ * @author Elias R. Gracia (elias.gracia@uah.es)
+ * @brief This code works with ergs_test5.lpp, but cant start the UDP negotitation,
+ * so a better management needs to be done. Only the load of the model is replied correctly,
+ * then the Opal, executes the model but dont send and receives data to the UDP. The Raspberry5
+ * sends the "READY_" message and sends data to OPAL that is not replied....
+ * @version 0.1
+ * @date 2026-06-04
+ * @state Finished, but not fully working
+ * @copyright Copyright (c) 2026
+ * 
+ */
+
 #include <iostream>
 #include <string>
 #include <cstring>

@@ -8,7 +8,7 @@
     and network interactions for better traceability.
     
     Note: This script is designed to run on a Windows machine with the OPAL-RT API
-    Date: 2024-06
+    Date: 2026-06
     @author: erg-cmd (elias.gracia@uah.es)
 """
 
@@ -46,22 +46,41 @@ try:
 except ImportError:
     print(f"Error: Could not find RtlabApi at {RTLAB_PATH}. Check your path settings.")
     sys.exit(1)
+    
+try:
+    import DataloggerApi as dlapi
+except ImportError:
+    print(f"Error: Could not find DataloggerApi at {RTLAB_PATH}. Check your path settings.")
+    sys.exit(1)
 
 # --- NETWORK & PROJECT PARAMETERS ---
 UDP_IP = "0.0.0.0"          # Listen on all local network adapters
 UDP_PORT = 5008             # Port on Windows PC waiting for the trigger code
 LAUNCH_CODE = b"LAUNCH_SIM" # Byte-string trigger payload
 PROJECT_PATH = r"C:\Archivos_INI_OPAL\ergs_test5\ergs_test5.llp"
+# PROJECT_PATH = r"C:\Archivos_INI_OPAL\ergs_test6\ergs_test6.llp"
+OPAL_TARGET_IP = "192.168.10.101"  # Target node IP address
 NEGOTIATION_TARGET_IP = "192.168.10.123"
 NEGOTIATION_TARGET_PORT = 5008
 EXPECTED_READY_IP = "192.168.10.123"
 EXPECTED_READY_PORT = 5008
 READY_TEXT = b"READY_"
 DUMMY_TEXT = b"ByeBye"
-PRESET_VALUES = [2.0, 0.005, 30.0, 1.0, 2.0, 10.0]
+
+ACQUIRE_SIGNALS = True  # Set to True to acquire signals from the target after execution starts
+ACQUIRE_TIME_START = 0.0  # Start time for signal acquisition in seconds
+ACQUIRE_DURATION = 150.0  # Duration for signal acquisition in seconds
+TSIM = ACQUIRE_DURATION + ACQUIRE_TIME_START + 1.0  # Total simulation time in seconds
+
+if ACQUIRE_SIGNALS and ACQUIRE_TIME_START + ACQUIRE_DURATION > TSIM:
+    print("[ACQ] Warning: Acquisition period exceeds simulation time, adjusting TSIM.")
+    TSIM = ACQUIRE_TIME_START + ACQUIRE_DURATION + 1.0  # Add buffer to TSIM
+
+PRESET_VALUES = [1.0, 0.003, TSIM, 2.0, 3.0, 9.0] # wo/BD
+# case / step / sim_time / wind_type / controller_type / mean wind speed
+
 NEGOTIATION_TIMEOUT_SECONDS = 60.0
 RESEND_PERIOD_SECONDS = 1.0
-
 
 def describe_model_state(model_state):
     try:
@@ -229,9 +248,15 @@ def main():
     print("[OPAL] System control requested.")
 
     print("[OPAL] Pre-loading model binaries...")
-    RtlabApi.Load(1, 1.0)
+    RtlabApi.Load(2, 1.0) # Always 2 for load type, 1.0 for timeout
     model_state, _ = RtlabApi.GetModelState()
     print(f"[OPAL] Load response: {describe_model_state(model_state)}")
+    
+    # Get the HOST target NAME and IP address
+    # SubSystemlist1 = RtlabApi.GetSubsystemList()
+    # TargetName = SubSystemlist1
+    # targetPlatform, version, arch, diskspace, cpucnt, cpuspeed, IP = RtlabApi.GetTargetNodeSystemInfo(str(TargetName))
+    # print("[OPAL] Model is loaded on %s target. Executing simulation...." %str(TargetName))
 
     print("[OPAL] Acquiring monitoring control...")
     RtlabApi.GetMonitoringControl(1)
@@ -264,15 +289,49 @@ def main():
             return
 
         print("[OPAL] READY_ validated. Starting execution...")
+        
+        
+        # Sleep briefly to ensure the target is ready, related with the offset at the start of the simulation
+        __Sleep = 0.46  
+        time.sleep(__Sleep)
+        
         start_time = time.perf_counter()
         RtlabApi.Execute(1.0)
         end_time = time.perf_counter()
-
+        
         latency_ms = (end_time - start_time) * 1000
         print(f"🚀 Simulation is now RUNNING! (API trigger latency: {latency_ms:.2f} ms)")
         
-        # Sleep for a short while to allow the simulation to run before cleanup
-        time.sleep(31)
+        
+        if ACQUIRE_SIGNALS:
+            time.sleep(ACQUIRE_TIME_START)  # Allow some time for the model to start executing before acquiring signals
+            signal_group = dlapi.SignalGroup(str(OPAL_TARGET_IP), 'ACQ0')
+            signal_group.start_recording()
+            print(f"📊 Signal acquisition started for {ACQUIRE_DURATION} seconds...")
+            time.sleep(ACQUIRE_DURATION)  # Record for the specified duration
+            signal_group.stop_recording()
+            print("📊 Signal acquisition stopped.")
+            
+            time.sleep(1.0)  # Allow some time for the model to finish executing before closing the project
+            EXIT_CONDITION = True  # Exit the loop after acquisition is complete
+        
+      
+        # Wait until the letter 'q' is pressed to quit the server
+        print("\n[STATUS] Press 'q' to stop the server and close the project.")
+        while True:
+            if msvcrt is not None and msvcrt.kbhit():
+                key = msvcrt.getch().decode("ascii", errors="ignore").lower()
+                if key == "q":
+                    print("Exiting server...")
+                    signal_group.close() if ACQUIRE_SIGNALS else None
+                    break
+            time.sleep(0.1)
+            
+            if EXIT_CONDITION:
+                print("[STATUS] Acquisition complete. Exiting server...")
+                signal_group.close() if ACQUIRE_SIGNALS else None
+                break
+        
 
     except (OSError, RuntimeError, ValueError) as e:
         print(f"\n[EXCEPTION] An error occurred during automation: {e}")
@@ -280,10 +339,18 @@ def main():
     finally:
         sock.close()
         RtlabApi.GetMonitoringControl(0)
+        
+        if not check_for_pause_state():  # PAUSE MODEL IF STILL RUNNING
+            RtlabApi.Pause()
+            
+        RtlabApi.Reset()
+
         RtlabApi.GetSystemControl(0)
         RtlabApi.CloseProject()
         print("[OPAL] Project closed and API disconnected cleanly.")
 
 
+
+# ===============================================================================
 if __name__ == "__main__":
     main()

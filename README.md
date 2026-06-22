@@ -1,6 +1,9 @@
 # OPAL_API
 ## Description
 
+### triggerv3:OK 
+
+### triggerv2:OK 
 
 ### trigger.py
 Just a draft, a guideline for what comes next; triggerv2 takes from devil_trigger2.cpp

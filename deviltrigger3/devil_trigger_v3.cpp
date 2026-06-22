@@ -414,7 +414,7 @@ int main()
     std::cout << "[OPAL] System control requested." << std::endl;
 
     std::cout << "[OPAL] Pre-loading model binaries..." << std::endl;
-    ret = OpalLoad(1, &instanceId, 1.0);
+    ret = OpalLoad(2, &instanceId, 1.0);
     if (ret != EOK)
     {
         print_error(ret, "OpalLoad");
@@ -592,3 +592,4 @@ int main()
     std::cout << "[OPAL] Project closed and API disconnected cleanly." << std::endl;
     return 0;
 }
+

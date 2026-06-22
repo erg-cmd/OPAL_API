@@ -59,19 +59,11 @@ EXPECTED_READY_IP = "192.168.10.123"
 EXPECTED_READY_PORT = 5008
 READY_TEXT = b"READY_"
 DUMMY_TEXT = b"ByeBye"
-TSIM = 20.0
-PRESET_VALUES = [1.0, 0.003, TSIM, 3.0, 3.0, 9.0] # wo/BD
-# PRESET_VALUES = [1.0, 0.002, TSIM, 1.0, 3.0, 10.0] # w/BD is Slow
+TSIM = 500.0
+PRESET_VALUES = [1.0, 0.003, TSIM, 2.0, 3.0, 9.0] # wo/BD
 # case / step / sim_time / wind_type / controller_type / mean wind speed
 NEGOTIATION_TIMEOUT_SECONDS = 60.0
 RESEND_PERIOD_SECONDS = 1.0
-
-def timed(label, fn, *args):
-    t0 = time.perf_counter()
-    result = fn(*args)
-    elapsed = (time.perf_counter() - t0) * 1000
-    print(f"[TIMING] {label}: {elapsed:.1f} ms")
-    return result
 
 
 def describe_model_state(model_state):
@@ -161,9 +153,7 @@ def wait_for_ready_and_negotiate(sock, target):
             if key == "d":
                 send_udp_packet(sock, target, msg_dummy, "dummy message")
             elif key == "p":
-                # send_udp_packet(sock, target, msg_preset, "preset float message")
-                print("Sending the preset values message to the target...")
-                return True
+                send_udp_packet(sock, target, msg_preset, "preset float message")
 
         sock.settimeout(0.2)
         try:
@@ -232,56 +222,65 @@ def check_for_pause_state():
 
 
 def main():
-    
     print(f"[OPAL] Opening project: {PROJECT_PATH}")
-    # RtlabApi.OpenProject(PROJECT_PATH)
-    timed("OpenProject",        RtlabApi.OpenProject, PROJECT_PATH)
+    RtlabApi.OpenProject(PROJECT_PATH)
     model_state, _ = RtlabApi.GetModelState()
     print(f"[OPAL] OpenProject response: {describe_model_state(model_state)}")
 
     print("[OPAL] Acquiring system control...")
-    # RtlabApi.GetSystemControl(1)
-    timed("GetSystemControl",   RtlabApi.GetSystemControl, 1)
+    RtlabApi.GetSystemControl(1)
     print("[OPAL] System control requested.")
+
+    print("[OPAL] Pre-loading model binaries...")
+    RtlabApi.Load(2, 1.0) # Always 2 for load type, 1.0 for timeout
+    model_state, _ = RtlabApi.GetModelState()
+    print(f"[OPAL] Load response: {describe_model_state(model_state)}")
+
+    print("[OPAL] Acquiring monitoring control...")
+    RtlabApi.GetMonitoringControl(1)
+    print("[OPAL] Monitoring control requested.")
     
+    # check if the model is running and pause it
+    if not check_for_pause_state():  # MODEL_RUNNING
+        RtlabApi.Pause(1.0)
+
+    if not wait_for_pause_state(timeout_seconds=60.0, poll_period=1.5):
+        print("\n[ERROR] Target failed to enter a stable PAUSE state within 60s. Aborting.")
+        RtlabApi.GetMonitoringControl(0)
+        RtlabApi.GetSystemControl(0)
+        RtlabApi.CloseProject()
+        return
+
+    print("\n[SUCCESS] Target perfectly mirrors the GUI state: PAUSED.")
+    print("[STATUS] AsyncIP network drivers are running on target. Awaiting UDP trigger...\n")
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((UDP_IP, UDP_PORT))
+    print(f"[UDP] Listening on port {UDP_PORT} for negotiation and trigger messages...")
+
+    negotiation_target = (NEGOTIATION_TARGET_IP, NEGOTIATION_TARGET_PORT)
+
     try:
-
-        print("[OPAL] Pre-loading model binaries...")
-        timed("Load",               RtlabApi.Load, 2, 1.0)
-        
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((UDP_IP, UDP_PORT))
-        print(f"[UDP] Listening on port {UDP_PORT} for negotiation and trigger messages...")
-        negotiation_target = (NEGOTIATION_TARGET_IP, NEGOTIATION_TARGET_PORT)
-
-        model_state, _ = RtlabApi.GetModelState()
-        print(f"[OPAL] Load response: {describe_model_state(model_state)}")
-
-        print("[OPAL] Acquiring monitoring control...")
-        timed("GetMonitoringControl", RtlabApi.GetMonitoringControl, 1)
-        print("[OPAL] Monitoring control requested.")      
-                
-        # time.sleep(0.6)  # 50 ms para que AsyncIP esté activo en el target
-        msg_preset = build_message_from_float_array(PRESET_VALUES)
-        send_udp_packet(sock, negotiation_target, msg_preset, "preset post-execute")
-                
-        start_time = time.perf_counter()
-        RtlabApi.Execute(1.0)
-        timed("Execute",            RtlabApi.Execute, 1.0)
-        end_time = time.perf_counter()
-        
-        latency_ms = (end_time - start_time) * 1000
-        print(f"🚀 Simulation is now RUNNING! (API trigger latency: {latency_ms:.2f} ms)")        
-        
-        
         got_ready = wait_for_ready_and_negotiate(sock, negotiation_target)
         if not got_ready:
             print("[OPAL] Execution canceled because READY_ was not validated.")
             return
 
-        print("[OPAL] READY_ validated....")
-        print(f"🚀 Simulation is now RUNNING!")
+        print("[OPAL] READY_ validated. Starting execution...")
         
+        
+        # Sleep briefly to ensure the target is ready, related with the offset at the start of the simulation
+        __Sleep = 0.46  
+        time.sleep(__Sleep)
+        
+        start_time = time.perf_counter()
+        RtlabApi.Execute(1.0)
+        end_time = time.perf_counter()
+        
+        latency_ms = (end_time - start_time) * 1000
+        print(f"🚀 Simulation is now RUNNING! (API trigger latency: {latency_ms:.2f} ms)")
+        
+      
         # Wait until the letter 'q' is pressed to quit the server
         print("\n[STATUS] Press 'q' to stop the server and close the project.")
         while True:
